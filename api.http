@@ -1,0 +1,59 @@
+# VS Code REST Client / JetBrains HTTP Client examples.
+@host = http://localhost:8080
+@key = dev-key
+
+### Create two accounts
+# @name alice
+POST {{host}}/v1/accounts
+X-API-Key: {{key}}
+Idempotency-Key: create-alice-1
+Content-Type: application/json
+
+{"owner": "alice", "currency": "USD"}
+
+###
+# @name bob
+POST {{host}}/v1/accounts
+X-API-Key: {{key}}
+Idempotency-Key: create-bob-1
+Content-Type: application/json
+
+{"owner": "bob", "currency": "USD"}
+
+### Fund alice (treasury -> alice)
+POST {{host}}/v1/accounts/{{alice.response.body.id}}/deposits
+X-API-Key: {{key}}
+Idempotency-Key: deposit-alice-1
+Content-Type: application/json
+
+{"amount": 10000, "reference": "card settlement #881"}
+
+### Transfer alice -> bob. Re-send this exact request: you get the same
+### 201 body back with Idempotent-Replay: true and no second debit.
+POST {{host}}/v1/transfers
+X-API-Key: {{key}}
+Idempotency-Key: order-42
+Content-Type: application/json
+
+{
+  "from_account_id": "{{alice.response.body.id}}",
+  "to_account_id": "{{bob.response.body.id}}",
+  "amount": 2500,
+  "currency": "USD",
+  "reference": "order 42"
+}
+
+### Same key, different payload -> 422
+POST {{host}}/v1/transfers
+X-API-Key: {{key}}
+Idempotency-Key: order-42
+Content-Type: application/json
+
+{"from_account_id": "{{alice.response.body.id}}", "to_account_id": "{{bob.response.body.id}}", "amount": 1, "currency": "USD"}
+
+### Statement with keyset pagination
+GET {{host}}/v1/accounts/{{alice.response.body.id}}/entries?limit=2
+X-API-Key: {{key}}
+
+### Metrics
+GET {{host}}/metrics
